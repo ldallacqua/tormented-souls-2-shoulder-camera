@@ -1,0 +1,9 @@
+dist/
+.cache/
+__pycache__/
+*.log
+*.sav
+*.dmp
+*.pak
+*.ucas
+*.utoc
