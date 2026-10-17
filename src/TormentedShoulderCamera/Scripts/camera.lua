@@ -156,16 +156,31 @@ function M.action(value)
 end
 local blockedFlags={'isInputDisabled','isSolvingPuzzle','isInteractingWithPuzzleComp','isInteractingWithChildPuzzleComp',
     'isInteractingWithPOI','bIsCharacterInteracting','bIsInsideInteraction','climbUp','climbDown','isFallen'}
+-- After a puzzle the game clears these flags ~0.5 s into gameplay. Entering the "Bad" world
+-- (TortureChamber_Bad) left isInteractingWithPuzzleComp set while Caroline walked around, and
+-- the shoulder view stayed off. Past this time in gameplay mode the flag is ignored.
+local lingering={isInteractingWithPuzzleComp=true,isInteractingWithChildPuzzleComp=true}
+local LINGER_LIMIT=1.5
+local lingerSince={}
+local function stale(name,set)
+    if not lingering[name] then return false end
+    if not set then lingerSince[name]=nil;return false end
+    lingerSince[name]=lingerSince[name] or clock
+    if clock-lingerSince[name]<=LINGER_LIMIT then return false end
+    if lingerSince[name]>=0 then log('Ignoring stale '..name..' (set for '..string.format('%.1f',clock-lingerSince[name])..' s in gameplay)');lingerSince[name]=-math.huge end
+    return true
+end
 local function blocked(pc,p)
-    if mode~='gameplay' then return mode end
+    if mode~='gameplay' then lingerSince={};return mode end
     if p.Health<=0 then return 'dead' end
     -- A flag that needs the native camera wins over one that only holds the view.
     local hold=nil
     for _,name in ipairs(blockedFlags) do
-        if p[name] then
+        local set=p[name] and true or false
+        if set and not stale(name,set) then
             if not holdReasons[name] then return name end
             hold=hold or name
-        end
+        elseif not set then stale(name,false) end
     end
     local ui=pc.UIManager
     if valid(ui) then

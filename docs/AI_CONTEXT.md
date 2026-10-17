@@ -7,6 +7,7 @@ identified in README). It replaces fixed exploration cameras with an orbiting sh
 view for a controller. Native target selection, damage, animations and puzzle logic remain;
 aiming is reworked (free aim to the crosshair, RE4-style walking while aiming).
 
+Version 0.4.1 moves hitscan shots onto the camera ray and ignores puzzle flags stuck in gameplay.
 Version 0.4.0 bends the torso to the crosshair (`RotationToAim`), limits steep shots and adds
 impact marks (impact.lua). Version 0.3.1 rebuilds the aim walk (reversed weapon aim-walk montage for the backpedal,
 side-step montages, CharacterMovement velocity instead of per-frame teleports). Version 0.3.0 adds: hold/freeze of the shoulder view for inventory and short interactions
@@ -31,7 +32,9 @@ hold, pause/inventory redirect any fixed camera; other holds redirect only the r
 that was replaced (`originalView`). Any other requested camera is the game's close-up: it is
 shown (`handedOff`) and the rig stays configured for the return. A close-up redirected less
 than 0.5 s before the hold, or a `GameInstance.CurrentCamera` that is not the room camera,
-is restored the same way. Other blocked states (cinematic, dialogue, menus, death, climbing,
+is restored the same way. `isInteractingWithPuzzleComp`/`isInteractingWithChildPuzzleComp` set for more than 1.5 s in
+gameplay mode are ignored (stuck after entering TortureChamber_Bad); the timer resets on any
+non-gameplay mode. Other blocked states (cinematic, dialogue, menus, death, climbing,
 `isInputDisabled`, `bIsCharacterInteracting`) still restore native view/component settings;
 the return configures the rig one frame before switching the view target.
 
@@ -97,6 +100,11 @@ towards the crosshair point with a Rodrigues rotation, so deviations from the ba
 channel of the last shot is reused for the crosshair trace (aim capsules). Unknowns: which
 weapons trace vs. fly, whether shotgun pellets are separate actors, and how the game's
 target lock (`RotateToTarget`) interacts with the body alignment. Read the `Free aim` logs.
+
+Hitscan shots (LineTraceMulti from BP_BaseAmmo children: Nail, ShotgunShell with 9 pellets, ...)
+are moved onto the camera ray: start = camera location + forward * (Caroline's depth), direction =
+camera forward (spread kept). Aiming from the muzzle missed at close range and on surfaces that
+ignore the crosshair trace channel. Flying ammo (rotation hook) still aims from its own location.
 
 `aim.lua` also writes `RotationToAim.pitch` from the hands (actor + 40 cm) to the crosshair point,
 eased, and resets it to 0 when aiming ends; it limits shots to -50 deg pitch. Camera pitch while

@@ -24,13 +24,14 @@ local noColor={R=0,G=0,B=0,A=0}
 local function valid(o) return o~=nil and o.IsValid~=nil and o:IsValid() end
 local function vec(v) return {X=v.X,Y=v.Y,Z=v.Z} end
 
--- The trace and rotation hooks can both report one shot: skip a near-identical repeat.
-function M.queue(start,dir,length)
+-- The trace and rotation hooks can both report one shot. A traced shot (kind 'trace') is what
+-- hits; the flight direction of the same ammo (kind 'flight', same key) is then dropped.
+function M.queue(start,dir,length,key,kind)
     for _,s in ipairs(pending) do
         local d,o=s.dir,s.start
         if d.X*dir.X+d.Y*dir.Y+d.Z*dir.Z>0.99995 and (o.X-start.X)^2+(o.Y-start.Y)^2+(o.Z-start.Z)^2<2500 then return end
     end
-    if #pending<MAX_PENDING then pending[#pending+1]={start=vec(start),dir=vec(dir),length=length} end
+    if #pending<MAX_PENDING then pending[#pending+1]={start=vec(start),dir=vec(dir),length=length,key=key,kind=kind} end
 end
 function M.pending() return #pending end
 
@@ -60,28 +61,32 @@ function M.flush(cfg,p,channel,log)
     if #pending==0 then return 0 end
     local shots=pending
     pending={}
+    local traced={}
+    for _,s in ipairs(shots) do if s.kind=='trace' and s.key then traced[s.key]=true end end
     if not cfg.impactMarks or not valid(p) then return 0 end
     local decal=find(log)
     if not decal then return 0 end
     local size=cfg.impactMarkSize or 5
     local placed=0
     for _,s in ipairs(shots) do
-        local finish={X=s.start.X+s.dir.X*s.length,Y=s.start.Y+s.dir.Y*s.length,Z=s.start.Z+s.dir.Z*s.length}
-        local hit={}
-        if UEHelpers.GetKismetSystemLibrary():LineTraceSingle(p,s.start,finish,channel,true,{p},0,hit,true,noColor,noColor,0) then
-            local owner=nil
-            pcall(function() local c=hit.Component:Get();if valid(c) then owner=c:GetOwner() end end)
-            local n=hit.ImpactNormal
-            if n and hit.ImpactPoint and not (valid(owner) and owner:IsA('/Script/Engine.Pawn')) then
-                -- The decal box projects along its X axis: point it into the surface.
-                local rotation={pitch=math.deg(math.asin(math.max(-1,math.min(1,-n.Z)))),Yaw=math.deg(math.atan(-n.Y,-n.X)),Roll=math.random()*360}
-                local d=UEHelpers.GetGameplayStatics():SpawnDecalAtLocation(p,decal,{X=4,Y=size,Z=size},vec(hit.ImpactPoint),rotation,cfg.impactMarkSeconds or 30)
-                local mid=valid(d) and d:CreateDynamicMaterialInstance() or nil
-                if valid(mid) then
-                    for name,texture in pairs(textures) do mid:SetTextureParameterValue(FName(name),texture) end
-                    placed=placed+1
-                elseif valid(d) then
-                    d:SetHiddenInGame(true,false) -- Never leave the base blood stain behind.
+        if not (s.kind=='flight' and traced[s.key]) then
+            local finish={X=s.start.X+s.dir.X*s.length,Y=s.start.Y+s.dir.Y*s.length,Z=s.start.Z+s.dir.Z*s.length}
+            local hit={}
+            if UEHelpers.GetKismetSystemLibrary():LineTraceSingle(p,s.start,finish,channel,true,{p},0,hit,true,noColor,noColor,0) then
+                local owner=nil
+                pcall(function() local c=hit.Component:Get();if valid(c) then owner=c:GetOwner() end end)
+                local n=hit.ImpactNormal
+                if n and hit.ImpactPoint and not (valid(owner) and owner:IsA('/Script/Engine.Pawn')) then
+                    -- The decal box projects along its X axis: point it into the surface.
+                    local rotation={pitch=math.deg(math.asin(math.max(-1,math.min(1,-n.Z)))),Yaw=math.deg(math.atan(-n.Y,-n.X)),Roll=math.random()*360}
+                    local d=UEHelpers.GetGameplayStatics():SpawnDecalAtLocation(p,decal,{X=4,Y=size,Z=size},vec(hit.ImpactPoint),rotation,cfg.impactMarkSeconds or 30)
+                    local mid=valid(d) and d:CreateDynamicMaterialInstance() or nil
+                    if valid(mid) then
+                        for name,texture in pairs(textures) do mid:SetTextureParameterValue(FName(name),texture) end
+                        placed=placed+1
+                    elseif valid(d) then
+                        d:SetHiddenInGame(true,false) -- Never leave the base blood stain behind.
+                    end
                 end
             end
         end

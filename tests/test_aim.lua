@@ -117,12 +117,18 @@ assert(registrations==2 and #widgets==1,'Aiming again reuses hooks and widget')
 aim.clear()
 local expected={X=wall-muzzle.X,Y=40-muzzle.Y,Z=160-muzzle.Z}
 
+local shotStart=nil
 local function shoot(world,direction)
     local finish=param({X=muzzle.X+direction.X*5000,Y=muzzle.Y+direction.Y*5000,Z=muzzle.Z+direction.Z*5000})
-    trace(param(nil),param(world),param(muzzle),finish,param(2))
-    local e=finish.value()
-    return {X=e.X-muzzle.X,Y=e.Y-muzzle.Y,Z=e.Z-muzzle.Z}
+    local start=param(muzzle)
+    trace(param(nil),param(world),start,finish,param(2))
+    local e,s=finish.value(),start.value()
+    shotStart=s
+    return {X=e.X-s.X,Y=e.Y-s.Y,Z=e.Z-s.Z}
 end
+-- Hitscan shots run along the camera ray (camera at -200,40,160 looking +X), level with Caroline.
+local cameraRay={X=1,Y=0,Z=0}
+local rayStart={X=0,Y=40,Z=160}
 
 -- Not aiming (a call still in flight after unregistering): nothing changes.
 local out=shoot(ammo,{X=1,Y=0,Z=0})
@@ -130,12 +136,13 @@ assert(close(out.X,5000) and close(out.Y,0),'Disarmed free aim must not touch sh
 
 aim.update(pc,pawn)
 out=shoot(ammo,{X=1,Y=0,Z=0})
-assert(angle(out,expected)<0.01,'The shot must go to the point under the crosshair')
-assert(close(math.sqrt(out.X^2+out.Y^2+out.Z^2),5000,1e-3),'Trace length is kept')
+assert(angle(out,cameraRay)<0.01,'The shot follows the camera ray through the crosshair')
+assert(close(shotStart.X,rayStart.X) and close(shotStart.Y,rayStart.Y) and close(shotStart.Z,rayStart.Z),'The shot starts on the camera ray, level with Caroline')
+assert(close(math.sqrt(out.X^2+out.Y^2+out.Z^2),5000,1e-3),'Trace length is kept (the muzzle is not ahead of the ray start here)')
 
 -- Pellet spread around the actor forward is kept.
 out=shoot(ammo,m.fromRotator({pitch=0,Yaw=4}))
-assert(close(angle(out,expected),4,0.01),'Pellet spread must survive the retarget')
+assert(close(angle(out,cameraRay),4,0.01),'Pellet spread must survive the retarget')
 
 -- Enemy traces (not player ammo) are left alone.
 out=shoot(object('BP_EnemyProjectile',{},{}),{X=1,Y=0,Z=0})
@@ -240,7 +247,7 @@ assert(#decals==0,'Marks are never placed inside the native hook')
 aim.update(pc,pawn,0.016)
 assert(#decals==1,'One mark per shot even when trace and rotation hooks both report it')
 local mark=decals[1]
-assert(close(mark.location.X,wall) and close(mark.location.Z,140+(160-140)*(wall-muzzle.X)/wall,1e-3),'The mark sits where the shot hits')
+assert(close(mark.location.X,wall) and close(mark.location.Y,40,1e-3) and close(mark.location.Z,160,1e-3),'The mark sits where the camera-ray shot hits: under the crosshair')
 assert(close(mark.rotation.Yaw,0) and close(mark.rotation.pitch,0),'The decal projects into the surface')
 assert(mark.life==30 and mark.size.Y==5 and mark.material,'Default life and size')
 assert(mark.material:GetFName():ToString():find('Blood_Stain') and mark.textures.DRO and mark.textures.Albedo and mark.textures.Normal,

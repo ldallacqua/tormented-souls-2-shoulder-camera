@@ -134,4 +134,27 @@ frame()
 assert(current==room,'Returning from a full restore warms up for one frame')
 frame()
 assert(isShoulder())
-print('PASS: inventory/puzzle hold, native close-ups and warm-up after full restore')
+
+-- Entering the "Bad" world left isInteractingWithPuzzleComp set while Caroline walked around:
+-- past 1.5 s in gameplay the flag is ignored and the shoulder view comes back.
+local badRoom=object('CameraActor_Bad',{},cameraActor)
+gameInstance.CurrentCamera=badRoom
+pawn.isInteractingWithPuzzleComp=true
+frame()
+pc:SetViewTargetWithBlend(badRoom,0.0)
+frame()
+assert(current==badRoom,'While the flag is fresh, a new camera is treated as a close-up')
+for _=1,100 do frame() end
+assert(isShoulder(),'A puzzle flag stuck in gameplay no longer keeps the native camera')
+pc:SetViewTargetWithBlend(badRoom,0.0)
+assert(isShoulder(),'The new world room camera is redirected like any other')
+pawn.isInteractingWithPuzzleComp=false
+for _=1,40 do frame() end -- Past the 0.5 s window where a redirect counts as a pending close-up.
+camera.mode_changed('puzzle');frame()
+camera.mode_changed('gameplay')
+pawn.isInteractingWithPuzzleComp=true
+frame()
+assert(isShoulder(),'A fresh flag after a real puzzle holds the view again (timer reset)')
+pawn.isInteractingWithPuzzleComp=false
+frame()
+print('PASS: inventory/puzzle hold, native close-ups, stale puzzle flag and warm-up after full restore')

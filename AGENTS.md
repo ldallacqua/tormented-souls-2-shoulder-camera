@@ -22,6 +22,8 @@ files must not be edited or committed. Regenerate them with `python tools/build.
   once on the first aim, return early unless armed, filter on BP_BaseAmmo, self-disable on error.
   Do not unregister per aim: UE4SS defers native removal and still runs the pending callback.
 - The crosshair is a UMG viewport widget; HUD:ReceiveDrawHUD does not fire in this game.
+- Hitscan shots start on the camera ray through the crosshair, not at the muzzle. Do not go back
+  to muzzle-to-point aiming: it missed close enemies and surfaces outside the crosshair channel.
 - Torso aim writes `RotationToAim.pitch` every aiming frame and must reset it to 0 when aiming ends
   (`aim.clear`). The ABP clamps it to -30..+40; do not bend the spine through other bones.
 - Impact marks are traced outside native hooks. The game's particle decal materials do not work as

@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.4.1 — 2026-10-17
+
+Mira
+- O tiro sai do raio da câmera, passando pelo retículo, como em jogos de terceira pessoa. Antes ele saía do cano até um ponto calculado sob o retículo. Superfícies e inimigos que não bloqueavam esse cálculo desviavam a linha do cano, que fica ao lado da câmera. Por isso a Nailgun errava inimigos de perto e alguns tiros na parede saíam bem à esquerda. O alcance e a dispersão de cada arma continuam os do jogo.
+
+Câmera
+- Outro mundo (`TortureChamber_Bad`): o jogo deixava a flag `isInteractingWithPuzzleComp` ligada enquanto a Caroline andava, e o mod mantinha a câmera fixa. Agora a flag é ignorada depois de 1,5 s em gameplay. Depois de um puzzle real ela some em ~0,5 s.
+
 ## 0.4.0 — 2026-10-17
 
 Mira

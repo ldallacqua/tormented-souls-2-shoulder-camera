@@ -13,6 +13,7 @@ local cfg,log
 local armed=false
 local pawn=nil
 local point,dir=nil,nil -- Point under the crosshair and camera forward, refreshed per frame.
+local ray=nil -- Camera ray through the crosshair, level with Caroline: where hitscan shots start.
 local onEnemy=false
 local channel=0 -- ETraceTypeQuery of the last player shot; Visibility until the first shot.
 local adjusted=0
@@ -96,8 +97,8 @@ local function trace(pc,p)
     local start,finish=add(loc,scale(fwd,skip)),add(loc,scale(fwd,skip+RANGE))
     local hit={}
     local blocked=UEHelpers.GetKismetSystemLibrary():LineTraceSingle(p,start,finish,channel,false,{p},0,hit,true,noColor,noColor,0)
-    if blocked then return vec(hit.ImpactPoint),fwd,hitActor(hit) end
-    return finish,fwd,nil
+    if blocked then return vec(hit.ImpactPoint),fwd,hitActor(hit),start end
+    return finish,fwd,nil,start
 end
 
 local function register(list,path,fn)
@@ -136,13 +137,13 @@ function M.update(pc,p,dt)
     if cfg.freeAim and #shotHooks==0 then
         for _,h in ipairs(shotHandlers) do register(shotHooks,h[1],h[2]) end
     end
-    local ok,pt,fwd,actor=pcall(trace,pc,p)
+    local ok,pt,fwd,actor,origin=pcall(trace,pc,p)
     if not ok then
         if not failed then failed=true;log('Aim trace unavailable: '..tostring(pt)) end
         point=nil;crosshair.update(pc,cfg.crosshair,false)
         return
     end
-    point,dir=pt,fwd
+    point,dir,ray=pt,fwd,origin
     onEnemy=valid(actor) and actor:GetAddress()~=p:GetAddress() and actor:IsA('/Script/Engine.Pawn') or false
     crosshair.update(pc,cfg.crosshair,onEnemy)
     if cfg.freeAim and cfg.torsoAim~=false then
@@ -158,7 +159,7 @@ function M.clear()
     if armed then crosshair.update(nil,false) end
     if torsoPawn then straightenTorso() end
     impact.clear()
-    armed=false;onEnemy=false;point=nil
+    armed=false;onEnemy=false;point=nil;ray=nil
 end
 
 -- Direction from a muzzle to the crosshair point. A wall right in front of the muzzle
@@ -208,10 +209,14 @@ function M.init(config,logger)
         local a=aimFrom(vec(ammo:K2_GetActorLocation()))
         local shot=rotateOnto(requested,base,a)
         newRotation:set(toRotator(shot,r.Roll))
-        if cfg.impactMarks then impact.queue(vec(ammo:K2_GetActorLocation()),shot,RANGE) end
+        if cfg.impactMarks then impact.queue(vec(ammo:K2_GetActorLocation()),shot,RANGE,ammo:GetAddress(),'flight') end
         report('rotation',requested,shot)
     end)}
-    -- Hitscan: the trace end decides what is hit.
+    -- Hitscan, third-person style: the game's damage trace is moved onto the camera ray through
+    -- the crosshair (starting level with Caroline), so whatever is under the crosshair is hit.
+    -- Aiming from the muzzle missed: it sits beside the camera ray, and surfaces or enemy capsules
+    -- that ignore the crosshair trace's channel bent the muzzle line away (tested in game).
+    -- The game's range is kept from the muzzle; pellet spread is kept around the crosshair.
     shotHandlers[#shotHandlers+1]={'/Script/Engine.KismetSystemLibrary:LineTraceMulti',guard('freeAim',function(_,world,start,finish,traceChannel)
         local ammo=ammoOf('trace',world:get())
         if not ammo then return end
@@ -223,9 +228,13 @@ function M.init(config,logger)
         local forward=norm(vec(ammo:GetActorForwardVector()))
         -- After the rotation hook the actor already faces the crosshair: keep its spread.
         local base=(forward and dot(d,forward)>SPREAD) and forward or d
-        local shot=rotateOnto(d,base,aimFrom(s))
-        finish:set(add(s,scale(shot,length)))
-        if cfg.impactMarks then impact.queue(s,shot,length) end
+        local origin,aim=s,aimFrom(s)
+        if ray then origin,aim=ray,M.limitShot(dir) or dir end
+        local shot=rotateOnto(d,base,aim)
+        length=length+math.max(0,dot(sub(s,origin),aim))
+        start:set(origin)
+        finish:set(add(origin,scale(shot,length)))
+        if cfg.impactMarks then impact.queue(origin,shot,length,ammo:GetAddress(),'trace') end
         report('trace',d,shot)
     end)}
     crosshair.init(logger)
