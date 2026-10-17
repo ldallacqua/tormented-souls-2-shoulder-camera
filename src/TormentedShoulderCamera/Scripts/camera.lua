@@ -31,6 +31,8 @@ local currentFov=cfg.fov
 local function valid(o) return o and o:IsValid() end
 local function log(s) print('[ShoulderCamera] '..s..'\n') end
 aim.init(cfg,log)
+-- Backpedal/side-step montages for the aim walk.
+local walker=aimwalk.animator(cfg,log)
 local function vec(v) return {X=v.X,Y=v.Y,Z=v.Z} end
 local function rot(v) return {pitch=v.pitch or v.Pitch,Yaw=v.Yaw,Roll=v.Roll} end
 local function key(name)
@@ -62,9 +64,8 @@ local wasAiming=false
 -- Aiming holds the game's movement input at zero; the left stick fine-aims instead.
 local aimHold=false
 local stickLogged=false
--- RE4-style aim walk (aimwalk.lua): the walk-cycle stick value and animation rate we drive.
+-- RE4-style aim walk (aimwalk.lua): the forward walk-cycle stick value we drive.
 local walkStick=nil
-local walkRate=1
 local lastYaw=nil
 -- Primitive components switched to OwnerNoSee while the camera is too close to the head.
 local hiddenParts=nil
@@ -122,8 +123,9 @@ local function restore()
             controller:SetViewTargetWithBlend(target,0.0,0,0.0,false)
         end
     end
-    if walkStick and valid(pawn) then pcall(function() pawn.Mesh.GlobalAnimRateScale=1 end) end
-    walkStick=nil;walkRate=1
+    if walkStick and valid(pawn) then walker:stop(pawn);pcall(function() pawn.StickX=0;pawn.StickY=0 end) end
+    aimwalk.release(pawn)
+    walkStick=nil
     active=false;handedOff=false;recent=nil;aimHold=false
     turnLeft=0;moveLatch=nil
 end
@@ -352,7 +354,8 @@ function M.update(pc,dt)
     if label~=lastReason then lastReason=label;log('State '..label) end
     if reason or not M.enabled then
         aim.clear()
-        if walkStick then walkStick=nil;walkRate=1;pcall(function() p.Mesh.GlobalAnimRateScale=1 end) end
+        if walkStick then walkStick=nil;walker:stop(p) end
+        aimwalk.release(p)
     end
     -- Freeze the shoulder view (pause, inventory, interactions) so resuming never exposes a fixed view.
     if M.enabled and active and reason and holdReasons[reason] then
@@ -407,20 +410,18 @@ function M.update(pc,dt)
     pc:SetControlRotation({pitch=pitch,Yaw=yaw,Roll=0})
     if aimMove then
         -- RE4-style: facing stays on the crosshair, the left stick walks relative to the camera.
+        -- Forward uses the game's aim-walk cycle; backpedal and side steps play Caroline's own
+        -- sequences as montages. No walking during a shot or reload, as in RE4.
         local busy=p.isAttacking or p.isReloading
-        local plan=aimwalk.plan(cfg,lx,ly,yaw,busy)
-        local target=1
-        if plan then
-            local ok,err=pcall(aimwalk.move,p,plan.dx*plan.speed*dt,plan.dy*plan.speed*dt)
-            if not ok then cfg.aimMove=false;log('Aim walk disabled after error: '..tostring(err)) end
-            walkStick=plan.stick;target=plan.rate
-        else walkStick=0 end
-        walkRate=ease(walkRate,target,14,dt)
+        local plan=(not busy) and aimwalk.plan(cfg,lx,ly,yaw) or nil
+        walker:update(p,plan and plan.anim or nil,plan and plan.rate or 1)
+        local ok,err=pcall(aimwalk.drive,p,plan and plan.dx*plan.speed or 0,plan and plan.dy*plan.speed or 0,dt)
+        if not ok then cfg.aimMove=false;aimwalk.release(p);log('Aim walk disabled after error: '..tostring(err)) end
+        walkStick=plan and plan.stick or 0
         p.StickX=0;p.StickY=walkStick
-        p.Mesh.GlobalAnimRateScale=walkRate
     elseif walkStick then
-        walkStick=nil;walkRate=1
-        p.Mesh.GlobalAnimRateScale=1
+        walkStick=nil;walker:stop(p);aimwalk.release(p)
+        p.StickX=0;p.StickY=0
     end
     p.TankMode=false;p.AutoNorth=false
     local north={pitch=0,Yaw=moveYaw(),Roll=0}

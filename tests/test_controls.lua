@@ -7,6 +7,7 @@ local function object(name,fields)
     o.GetAddress=function() return name end
     o.GetFName=function() return FName(name) end
     o.GetFullName=function() return name end
+    o.GetPlayLength=function() return 1.0 end
     o.IsA=function() return true end
     return o
 end
@@ -37,11 +38,18 @@ local pawn=object('Caroline',{CameraBoom=boom,FollowCamera=view,Health=100,TankM
     NorthCamera=rotator(0),RAfterCameraChange=rotator(0),['Last Camera Rotator']=rotator(0),['Current Camera Rotator']=rotator(0)})
 pawn.K2_GetActorRotation=function() return rotator(0) end
 pawn.K2_SetActorRotation=function() end
-pawn.Mesh={GlobalAnimRateScale=1}
--- Open floor with the capsule centre resting at z=90.
-local pos={X=0,Y=0,Z=92}
-pawn.K2_GetActorLocation=function() return {X=pos.X,Y=pos.Y,Z=pos.Z} end
-pawn.K2_SetActorLocation=function(_,to,sweep) pos={X=to.X,Y=to.Y,Z=sweep and math.max(to.Z,90) or to.Z} return true end
+local montage=nil
+local animInst={IsValid=function() return true end}
+function animInst:PlaySlotAnimationAsDynamicMontage(seq,slot,bi,bo,rate) montage={seq=seq:GetFullName(),rate=rate,IsValid=function() return true end};return montage end
+function animInst:Montage_GetPosition() return 0.5 end
+function animInst:Montage_SetPosition() end
+function animInst:Montage_IsPlaying(m) return montage==m end
+function animInst:Montage_SetPlayRate(m,r) m.rate=r end
+function animInst:StopSlotAnimation() montage=nil end
+pawn.Mesh={GlobalAnimRateScale=1,GetAnimInstance=function() return animInst end}
+local movement={GroundFriction=8,BrakingDecelerationWalking=2048,bCanWalkOffLedges=true,Velocity={X=0,Y=0,Z=0},IsValid=function() return true end}
+pawn.CharacterMovement=movement
+pawn.currentWeaponID={ToString=function() return 'Nailgun' end}
 local axes,buttons={},{}
 local control=rotator(0)
 local pc=object('Controller',{Pawn=pawn})
@@ -115,18 +123,30 @@ pawn.isAiming=true;axes.Gamepad_LeftY=0
 frames(1)
 assert(feed(0.8)==0,'Movement input is held while aiming')
 startYaw=control.Yaw
-local before={X=pos.X,Y=pos.Y}
 axes.Gamepad_LeftY=-1
 frames(30)
 assert(close(control.Yaw,startYaw,0.01),'Walking while aiming does not turn the aim')
-local backward=(pos.X-before.X)*math.cos(math.rad(startYaw))+(pos.Y-before.Y)*math.sin(math.rad(startYaw))
-assert(backward<-20,'Stick down backpedals away from the crosshair')
-assert(pawn.StickY>0 and pawn.Mesh.GlobalAnimRateScale<-0.5,'The walk cycle plays reversed for the backpedal')
+local v=movement.Velocity
+local backward=v.X*math.cos(math.rad(startYaw))+v.Y*math.sin(math.rad(startYaw))
+assert(backward<-50 and movement.GroundFriction==0,'Stick down backpedals away from the crosshair')
+assert(pawn.StickY==0 and montage and montage.seq:find('Nailer_Walk_Aim') and montage.rate<0,'Backpedal plays the aim walk reversed')
+assert(pawn.Mesh.GlobalAnimRateScale==1,'The animation rate is never touched')
+axes.Gamepad_LeftY=1
+frames(5)
+assert(pawn.StickY>0.9 and montage==nil,'Forward switches back to the native aim-walk cycle')
+axes.Gamepad_LeftY=-1
+frames(5)
+pawn.isAttacking=true
+frames(2)
+assert(montage==nil and pawn.StickY==0,'No walking during a shot')
+pawn.isAttacking=false
 axes.Gamepad_LeftY=0
 frames(30)
-assert(pawn.StickY==0 and pawn.Mesh.GlobalAnimRateScale>0.9,'Releasing the stick stops the cycle')
+assert(pawn.StickY==0 and montage==nil,'Releasing the stick stops walking')
+axes.Gamepad_LeftY=-1;frames(3)
 pawn.isAiming=false
 frames(1)
-assert(pawn.Mesh.GlobalAnimRateScale==1,'Leaving aim restores the animation rate')
+assert(montage==nil,'Leaving aim stops the montage')
+assert(movement.GroundFriction==8 and movement.Velocity.X==0,'Leaving aim restores the movement component')
 assert(feed(0.8)==0.8,'Movement input is untouched when not aiming')
 print('PASS: L3 shoulder swap, aim blend, stick curve, quick turn and aim stick hold')

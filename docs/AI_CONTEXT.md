@@ -7,7 +7,8 @@ identified in README). It replaces fixed exploration cameras with an orbiting sh
 view for a controller. Native target selection, damage, animations and puzzle logic remain;
 aiming is reworked (free aim to the crosshair, RE4-style walking while aiming).
 
-Version 0.3.0 adds: hold/freeze of the shoulder view for inventory and short interactions
+Version 0.3.1 rebuilds the aim walk (reversed weapon aim-walk montage for the backpedal,
+side-step montages, CharacterMovement velocity instead of per-frame teleports). Version 0.3.0 adds: hold/freeze of the shoulder view for inventory and short interactions
 (no fixed-camera flash), free aim + UMG crosshair, RE4-style aim walk (aimwalk.lua), L3
 shoulder swap, quick turn, breathing sway/turn lean (no footstep bob: it caused motion
 sickness). 0.2.1 brought two-stage collision, character hiding near the head and the zone
@@ -123,10 +124,26 @@ to facing, ABP variables), not by decompiling:
   `K2_SetActorLocation` moves her. `GlobalAnimRateScale=-1` turns the cycle into a correct
   backpedal (feet slide forward).
 - A hidden mesh (`OwnerNoSee`, tick option 4) stops refreshing bones; probes force option 0.
+- Negative `GlobalAnimRateScale` looked right in foot measurements but froze/stretched the
+  spine in play (negative delta time into other anim nodes). Do not use it.
+- Forcing ABP variables (`Moving B/L/R`, `Direction`, `Target Assigned`, `Auto Moving
+  Backwards`, analog/tank flags) after `BlueprintUpdateAnimation` never changes the aim locomotion.
+- `PlaySlotAnimationAsDynamicMontage` works while aiming on `DefaultSlot`/`UpperBody` (both
+  drive the legs; `EquipAnimSlot`, `AttackInIdle`, `GrabSlot`, `FallSlot` do nothing then).
+  Planted foot: `back_pedal` +88 cm/s, `side_step_Left/Right` +-104 cm/s. `back_pedal` lowers the
+  weapon and turns her head (user feedback). The weapon's aim-walk sequence matches the native
+  cycle (Nailgun: `Nailer_Walk_Aim`, identical average hand positions; `Automatic_Nailer_Aim_Walk`
+  differs). Played at rate -1 from the end it backpedals at +92 cm/s with the weapon raised; a
+  reversed montage does not loop, so `Montage_SetPosition` wraps it near 0.
+- `currentWeaponID` (FString) names the weapon (`Nailgun`); the ABP has `Weapon ID` too.
+- Teleporting with swept `K2_SetActorLocation` each frame made the actor height oscillate
+  ~1 cm per frame (camera judder). Writing `CharacterMovement.Velocity` with `GroundFriction=0`
+  and `BrakingDecelerationWalking=0` moves her while aiming with a stable height and smooth steps.
 `aimwalk.lua` builds the RE4 walk from these: pre-hooks zero the game's stick input,
-post-hooks rewrite `StickY` for the cycle, `plan` picks direction/speed/rate (reversed for
-backpedal unless a shot/reload is playing), `move` sweeps with wall slide, 30 cm step-up,
-floor follow and no ledge drops. Side steps have no animation of their own (short shuffle).
+post-hooks rewrite `StickY` for the forward cycle, `plan` picks forward/back/left/right and the
+rate, the animator plays side steps or the reversed aim walk (`back_pedal` for unmapped weapons)
+as montages, and `drive`/`release` own the CharacterMovement settings. No walking during a shot
+or reload (their montages share the slot group).
 
 ## Exploration input mappings (probed in game)
 

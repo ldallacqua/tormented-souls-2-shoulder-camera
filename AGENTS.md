@@ -9,8 +9,13 @@ files must not be edited or committed. Regenerate them with `python tools/build.
 - Movement must remain relative to the visible camera through fixed-camera triggers.
 - Keep all four direction-reference rotators synchronized. Do not reintroduce tank movement.
 - Keep right-stick shortcuts disabled only in exploration presets; preserve inventory/puzzle controls.
-- While aiming the game's stick input is held at zero and aimwalk.lua moves Caroline. Restore
-  `GlobalAnimRateScale` to 1 whenever aiming ends or the camera is restored.
+- While aiming the game's stick input is held at zero and aimwalk.lua moves Caroline through
+  CharacterMovement (friction/braking off, written velocity). `aimwalk.release` must run whenever
+  aiming ends or the camera is restored. Never use negative `GlobalAnimRateScale` (it broke her
+  spine); reverse a sequence with a negative montage play rate instead.
+- A nil object or FName passed to an engine call crashes UE4SS natively (pcall cannot catch it).
+  Check every argument before calling. `UAnimInstance:GetCurrentStateName(i)` with an index that
+  is not a state machine also crashes the game: do not probe anim nodes by index.
 - Up/down shortcut axes differ from movement axes. Preserve the tested inversion.
 - Camera sweeps must use hit fraction/distance, not the unreliable packed penetration boolean.
 - Free-aim native hooks (K2_SetActorRotation, LineTraceMulti) fire for every actor: register them

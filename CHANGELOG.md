@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.3.1 — 2026-10-17
+
+Andar mirando (estilo RE4), refeito a partir do teste no jogo
+- Recuo: toca a caminhada mirando da arma ao contrário (Nailgun: `Nailer_Walk_Aim`, mesma pose de mãos da caminhada do jogo), com a arma erguida. Armas sem caminhada mirando conhecida usam o `back_pedal` da Caroline. O log `Aim walk backpedal for ...` mostra a escolha por arma.
+- Passos laterais: animações próprias do jogo (`side_step_Left/Right`) como montage, sem a caminhada para frente que causava o efeito diagonal.
+- Não usa mais `GlobalAnimRateScale` negativo, que travava o tronco e esticava a malha.
+- Deslocamento pelo `CharacterMovement` (velocidade escrita, atrito e frenagem zerados durante a mira e restaurados depois, sem cair de beirais). Teleportar a personagem a cada frame fazia a altura oscilar ~1 cm por frame e a câmera tremer em degraus; medido no jogo, a irregularidade do passo caiu de 11 para 0,5 cm/s.
+- Não anda durante tiro ou recarga.
+- Novas opções: `aimSideSpeed`, `aimWalkSlot`.
+
 ## 0.3.0 — 2026-10-17
 
 Mira
@@ -21,7 +31,7 @@ Controles
 Diagnóstico
 - Logs `State`, `Native camera during`, `Close-up camera restored`, `Aim start/end`, `Aim probe` e `Free aim`.
 
-Validado no jogo: congelamento no inventário, close-up de puzzle (`BP_MuseumKeyPuzzle`), retículo visível. Validado por medição no jogo: recuo com ciclo invertido, deslocamento por varredura mirando. Pendente: sensação do andar mirando, mira livre com cada arma, quick turn (o botão também pode esquivar), L3, inspeção de itens e documentos.
+Validado no jogo: congelamento no inventário, close-up de puzzle (`BP_MuseumKeyPuzzle`), retículo visível. (O recuo com ciclo invertido e o deslocamento por varredura desta versão foram substituídos na 0.3.1.) Pendente: sensação do andar mirando, mira livre com cada arma, quick turn (o botão também pode esquivar), L3, inspeção de itens e documentos.
 
 ## 0.2.1 — 2026-10-16
 

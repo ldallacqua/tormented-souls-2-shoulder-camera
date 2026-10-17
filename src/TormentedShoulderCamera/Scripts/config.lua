@@ -14,7 +14,9 @@ return {
     aimSensitivity=0.6, -- Right-stick speed multiplier while aiming.
     aimMove=true, -- RE4-style: walk in any direction while aiming, facing the crosshair.
     aimWalkSpeed=96, -- cm/s, the game's own aim-walk speed.
-    aimBackSpeed=0.8, -- Backpedal speed multiplier.
+    aimBackSpeed=0.9, -- Backpedal speed/animation rate multiplier.
+    aimSideSpeed=0.85, -- Side-step speed/animation rate multiplier.
+    aimWalkSlot='DefaultSlot', -- Montage slot for the backpedal/side-step animations.
     aimLeftStick=0.7, -- With aimMove=false Caroline stands still and the left stick aims.
     aimWalk=false, -- true hands movement back to the game (it turns her towards the stick).
     invertY=true, -- Stick up looks up with the tested controller.
