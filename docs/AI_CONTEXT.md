@@ -6,10 +6,11 @@ An unofficial UE4SS Lua mod for Tormented Souls 2 (Windows, tested UE 5.5.4 exec
 identified in README). It replaces fixed exploration cameras with an orbiting shoulder
 view for a controller. Native combat, target selection, animation and puzzle logic remain.
 
-Version 0.2.0 was validated interactively by the player for movement, camera orbit,
-wall/picture collision, all four D-pad shortcuts and pause/resume. A small flash remains
-when returning from inventory/item interaction to the shoulder view. This is the next
-investigation target; do not describe it as already fixed.
+Version 0.2.1 incorporates two-stage camera collision (head-to-shoulder, shoulder-back),
+safe character hiding when close to head (<30 cm), and elimination of the ~180° snap
+when entering zone cameras by disabling AutoNorthLocal on BP_RailCamera and synchronizing
+movement references. A small flash remains when returning from inventory/item interaction
+to the shoulder view. This is the next investigation target; do not describe it as already fixed.
 
 ## Runtime flow
 
@@ -32,12 +33,13 @@ old `Gamepad_Right2D` shortcut key to None. Keyboard mappings and other contexts
 unchanged. It requests mapping rebuilds and restores snapshots when disabled/unloaded.
 Restoration skips entries changed by another mod after this mod applied its mapping.
 
-`collision.lua` computes the desired shoulder endpoint and sweeps a sphere from the
-character pivot (actor location plus height) to that endpoint, using Visibility queries
-with simple and complex geometry. It picks the nearest hit, retracts immediately, and
-eases outward with an exponential decay. Arm distance and shoulder offset share the same
-fraction so the final endpoint remains on the swept segment. Native Camera-channel
-spring-arm collision remains enabled as an additional check.
+`collision.lua` computes camera clearance via a two-stage sweep: first from the head
+pivot to the shoulder lateral point, then from that lateral point backward along the
+camera orientation. It uses Visibility/Camera queries with simple and complex geometry,
+ignores pawns and UI widgets (such as QTE components), and retries with a thin probe
+if initially penetrating decorative meshes. Lateral and backward fractions ease outward
+independently. Native spring-arm collision is disabled during shoulder view to prevent
+it from collapsing the camera back to the head when against a back wall.
 
 ## Verified reflection details and pitfalls
 

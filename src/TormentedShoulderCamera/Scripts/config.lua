@@ -12,4 +12,5 @@ return {
     deadzone=0.20,
     invertY=true, -- Stick up looks up with the tested controller.
     collisionRadius=16,
+    hideCharacterBelow=30, -- Hide Caroline when the camera is closer than this to her head.
 }
