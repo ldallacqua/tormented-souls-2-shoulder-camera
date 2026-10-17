@@ -93,4 +93,12 @@ walk.release(pawnM)
 assert(cm.GroundFriction==8 and cm.BrakingDecelerationWalking==2048 and cm.bCanWalkOffLedges==true,'Originals restored')
 assert(cm.Velocity.X==0 and cm.Velocity.Y==0 and not walk.driving(),'Release stops her')
 walk.release(pawnM)
+-- Weapon IDs are matched loosely: both spellings of the cannon, the machine-gun folder name.
+for id,want in pairs({HandCanon='HandCannon_Walk_aim',HandCannon='HandCannon_Walk_aim',Machinegun='Automatic_Nailer_Aim_Walk',
+        AutomaticNailer='Automatic_Nailer_Aim_Walk',Nailgun='Nailer_Walk_Aim',Hammer='Hammer_Aim_Walk',Crowbar='Crowbar_Walk_Aim'}) do
+    local path,reverse=walk.backSequence(id)
+    assert(path:find(want,1,true) and reverse,'Aim walk for '..id)
+end
+local path,reverse=walk.backSequence('SomethingElse')
+assert(path:find('back_pedal',1,true) and not reverse,'Unknown weapons fall back to back_pedal')
 print('PASS: aim walk plan, own side-step and reversed aim-walk montages, CharacterMovement drive')

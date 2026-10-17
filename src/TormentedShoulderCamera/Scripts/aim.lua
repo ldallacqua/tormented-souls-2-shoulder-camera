@@ -29,6 +29,7 @@ local ammoClass='/Game/GameplaySystems/WeaponSystem/Ammo/BP_BaseAmmo.BP_BaseAmmo
 local noColor={R=0,G=0,B=0,A=0}
 local SPREAD=math.cos(math.rad(20)) -- Wider deviations are not spread: the shot ignored the base direction.
 local RANGE=6000
+local FIRE_RADIUS=250 -- A shot's own traces start at the muzzle, within this distance of Caroline.
 -- Torso pitch (probed): the character's RotationToAim.pitch drives four ModifyBone nodes on
 -- spine_02 in her anim blueprint, 1:1, clamped there to -30..+40 degrees. It is how the game
 -- bends her towards a target on the floor; free aim writes it from the crosshair point.
@@ -217,11 +218,13 @@ function M.init(config,logger)
     -- Aiming from the muzzle missed: it sits beside the camera ray, and surfaces or enemy capsules
     -- that ignore the crosshair trace's channel bent the muzzle line away (tested in game).
     -- The game's range is kept from the muzzle; pellet spread is kept around the crosshair.
-    shotHandlers[#shotHandlers+1]={'/Script/Engine.KismetSystemLibrary:LineTraceMulti',guard('freeAim',function(_,world,start,finish,traceChannel)
-        local ammo=ammoOf('trace',world:get())
-        if not ammo then return end
-        channel=traceChannel:get()
+    -- Some ammo also sweeps a sphere when fired (read from the ammo classes), handled the same way.
+    -- Traces that start away from Caroline belong to a projectile in flight or its impact and are
+    -- left alone: moving them onto the camera ray would break that ammo's own hit logic.
+    local function retarget(kind,ammo,start,finish,traceChannel)
         local s,e=vec(start:get()),vec(finish:get())
+        if len(sub(s,vec(pawn:K2_GetActorLocation())))>FIRE_RADIUS then probe(kind..' far',ammo);return end
+        if traceChannel then channel=traceChannel:get() end
         local d=sub(e,s);local length=len(d)
         if length<1 then return end
         d=scale(d,1/length)
@@ -235,7 +238,16 @@ function M.init(config,logger)
         start:set(origin)
         finish:set(add(origin,scale(shot,length)))
         if cfg.impactMarks then impact.queue(origin,shot,length,ammo:GetAddress(),'trace') end
-        report('trace',d,shot)
+        report(kind,d,shot)
+    end
+    shotHandlers[#shotHandlers+1]={'/Script/Engine.KismetSystemLibrary:LineTraceMulti',guard('freeAim',function(_,world,start,finish,traceChannel)
+        local ammo=ammoOf('trace',world:get())
+        if ammo then retarget('trace',ammo,start,finish,traceChannel) end
+    end)}
+    -- SphereTraceMulti(WorldContext, Start, End, Radius, TraceChannel, ...).
+    shotHandlers[#shotHandlers+1]={'/Script/Engine.KismetSystemLibrary:SphereTraceMulti',guard('freeAim',function(_,world,start,finish,_,traceChannel)
+        local ammo=ammoOf('sphere',world:get())
+        if ammo then retarget('sphere',ammo,start,finish,traceChannel) end
     end)}
     crosshair.init(logger)
 end

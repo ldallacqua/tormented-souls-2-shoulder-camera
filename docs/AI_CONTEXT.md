@@ -7,6 +7,7 @@ identified in README). It replaces fixed exploration cameras with an orbiting sh
 view for a controller. Native target selection, damage, animations and puzzle logic remain;
 aiming is reworked (free aim to the crosshair, RE4-style walking while aiming).
 
+Version 0.4.2 audits all ammo (sphere traces, in-flight traces left alone, loose aim-walk IDs).
 Version 0.4.1 moves hitscan shots onto the camera ray and ignores puzzle flags stuck in gameplay.
 Version 0.4.0 bends the torso to the crosshair (`RotationToAim`), limits steep shots and adds
 impact marks (impact.lua). Version 0.3.1 rebuilds the aim walk (reversed weapon aim-walk montage for the backpedal,
@@ -101,6 +102,11 @@ channel of the last shot is reused for the crosshair trace (aim capsules). Unkno
 weapons trace vs. fly, whether shotgun pellets are separate actors, and how the game's
 target lock (`RotateToTarget`) interacts with the body alignment. Read the `Free aim` logs.
 
+Ammo audit (dump + pak index, 2026-10-17): every ammo class is a BP_BaseAmmo child. Some also
+call SphereTraceMulti (hooked, same retarget) and LineTraceSingle (not hooked: used by flying
+ammo). Retargets apply only to traces starting within 250 cm of Caroline (fire time); in-flight and
+impact traces are left alone. Only five aim-walk sequences exist (nail, automatic nail, hand cannon,
+hammer, crowbar); other weapons back-pedal with `back_pedal`.
 Hitscan shots (LineTraceMulti from BP_BaseAmmo children: Nail, ShotgunShell with 9 pellets, ...)
 are moved onto the camera ray: start = camera location + forward * (Caroline's depth), direction =
 camera forward (spread kept). Aiming from the muzzle missed at close range and on surfaces that

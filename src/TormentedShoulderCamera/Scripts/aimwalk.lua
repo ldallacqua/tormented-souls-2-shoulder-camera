@@ -21,9 +21,14 @@ M.sequences={
     right=C..'Animations_Rig/side_step_Right.side_step_Right',
 }
 -- Aim-walk sequence per weapon ID keyword (checked in order), played reversed to backpedal.
+-- These five are the only aim-walk sequences in the game files; IDs are matched loosely
+-- because the game's own names vary (class BP_HandCanon, folder Ranged/Machinegun).
+local AUTO=C..'5_Automatic_Nailer/Automatic_Nailer_Aim_Walk.Automatic_Nailer_Aim_Walk'
 M.aimWalks={
-    {{'auto','nail'},C..'5_Automatic_Nailer/Automatic_Nailer_Aim_Walk.Automatic_Nailer_Aim_Walk'},
+    {{'auto','nail'},AUTO},
+    {{'machine'},AUTO},
     {{'nail'},C..'Nailer/Nailer_Walk_Aim.Nailer_Walk_Aim'},
+    {{'canon'},C..'HandCanon/New_Anims/HandCannon_Walk_aim.HandCannon_Walk_aim'},
     {{'cannon'},C..'HandCanon/New_Anims/HandCannon_Walk_aim.HandCannon_Walk_aim'},
     {{'hammer'},C..'4_Hammer/Hammer_Aim_Walk.Hammer_Aim_Walk'},
     {{'crowbar'},C..'Crowbar/NewAnim/Crowbar_Walk_Aim.Crowbar_Walk_Aim'},

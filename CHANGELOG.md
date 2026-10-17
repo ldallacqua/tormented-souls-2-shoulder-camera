@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.4.2 — 2026-10-17
+
+Armas (conferido nos arquivos do jogo, sem testar as armas que ainda não apareceram)
+- Munições que também varrem uma esfera ao disparar seguem o retículo, como os traces de linha.
+- Traces que começam longe da Caroline pertencem a um projétil em voo ou ao impacto dele e não são mais movidos. Movê-los quebraria a lógica de acerto dessa munição.
+- Andar mirando: o jogo só tem 5 animações de andar mirando, todas mapeadas. O mapeamento agora aceita as grafias que o jogo usa nos próprios nomes.
+
 ## 0.4.1 — 2026-10-17
 
 Mira

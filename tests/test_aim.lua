@@ -102,7 +102,8 @@ assert(not hooks[tracePath] and not hooks[rotationPath],'Shot hooks fire for eve
 assert(not hooks['/Script/Engine.HUD:ReceiveDrawHUD'],'ReceiveDrawHUD never fires in this game')
 aim.update(pc,pawn)
 local trace,rotation=hooks[tracePath],hooks[rotationPath]
-assert(trace and rotation and registrations==2,'The first aim registers the shot hooks')
+local sphere=hooks['/Script/Engine.KismetSystemLibrary:SphereTraceMulti']
+assert(trace and rotation and sphere and registrations==3,'The first aim registers the shot hooks')
 -- Crosshair: one widget, five parts, visible while aiming.
 assert(#widgets==1 and slotCalls==5,'The crosshair widget is built once with five parts')
 local cross=widgets[1]
@@ -113,7 +114,7 @@ aim.clear()
 assert(unregistered==0,'Pending native unregistration still runs once in UE4SS: keep the hooks, gate them instead')
 assert(cross.visibility==2,'The crosshair hides when aiming ends')
 aim.update(pc,pawn)
-assert(registrations==2 and #widgets==1,'Aiming again reuses hooks and widget')
+assert(registrations==3 and #widgets==1,'Aiming again reuses hooks and widget')
 aim.clear()
 local expected={X=wall-muzzle.X,Y=40-muzzle.Y,Z=160-muzzle.Z}
 
@@ -147,6 +148,21 @@ assert(close(angle(out,cameraRay),4,0.01),'Pellet spread must survive the retarg
 -- Enemy traces (not player ammo) are left alone.
 out=shoot(object('BP_EnemyProjectile',{},{}),{X=1,Y=0,Z=0})
 assert(close(out.Y,0) and close(out.Z,0),'Only player ammo is retargeted')
+
+-- Sphere sweeps fired with the shot follow the camera ray too (Radius sits before the channel).
+do
+    local start,finish=param(muzzle),param({X=muzzle.X+800,Y=muzzle.Y,Z=muzzle.Z})
+    sphere(param(nil),param(ammo),start,finish,param(30),param(2))
+    local s0,e0=start.value(),finish.value()
+    assert(close(s0.Y,40) and close(s0.Z,160) and close(e0.Y,40) and close(e0.Z,160),'Sphere traces fired with the shot run along the camera ray')
+end
+-- A trace far from Caroline is a projectile in flight or its impact: left alone.
+do
+    local far={X=900,Y=300,Z=50}
+    local start,finish=param(far),param({X=far.X+100,Y=far.Y,Z=far.Z})
+    trace(param(nil),param(ammo),start,finish,param(2))
+    assert(start.value()==far and close(finish.value().X,1000) and close(finish.value().Y,300),'In-flight/impact traces are not moved')
+end
 
 -- Projectile rotation follows the crosshair too.
 local newRotation=param({pitch=0,Yaw=0,Roll=0})
