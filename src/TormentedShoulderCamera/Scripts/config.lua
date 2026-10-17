@@ -24,6 +24,11 @@ return {
     collisionRadius=16,
     hideCharacterBelow=30, -- Hide Caroline when the camera is closer than this to her head.
     freeAim=true, -- Shots follow the crosshair while aiming in the shoulder view.
+    torsoAim=true, -- With free aim, Caroline's torso bends up/down towards the crosshair.
+    aimMinPitch=-35, -- Lowest camera pitch while aiming (keeps the crosshair off her feet).
+    impactMarks=true, -- Mark where shots land (to check the aim); enemies get no mark.
+    impactMarkSeconds=30,
+    impactMarkSize=5, -- Half size of the mark, cm.
     crosshair=true,
     shoulderSwapButton='Gamepad_LeftThumbstick', -- L3; set to false to disable.
     quickTurn=true, -- Left stick back + run/dodge button turns the camera 180 degrees.

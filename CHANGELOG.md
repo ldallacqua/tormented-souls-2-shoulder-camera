@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.4.0 — 2026-10-17
+
+Mira
+- O tronco da Caroline inclina para cima e para baixo seguindo o retículo. Usa o mesmo ajuste de coluna que o jogo aplica para mirar em inimigos caídos (`RotationToAim`), com o limite da própria animação: até 30° para baixo e 40° para cima. Volta ao normal ao soltar a mira. `torsoAim=false` desliga.
+- Proteção contra atirar no próprio pé: ao mirar, a câmera desce no máximo até `aimMinPitch` (-35°), e nenhum tiro sai mais inclinado que 50° para baixo.
+- Marcas de tiro (`impactMarks`): cada tiro deixa uma marca escura no ponto atingido por 30 s, para conferir a mira. Inimigos não recebem marca. Os decals de partícula do jogo viram quadrados fora do Niagara; a marca usa o material de decal Megascans do jogo com a textura `Impact23`.
+
+Conhecido
+- Shotgun: no primeiro teste a marca não caiu exatamente no retículo; em investigação.
+
 ## 0.3.1 — 2026-10-17
 
 Andar mirando (estilo RE4), refeito a partir do teste no jogo

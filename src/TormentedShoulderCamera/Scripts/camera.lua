@@ -397,8 +397,12 @@ function M.update(pc,dt)
     end
     yaw=(yaw+x*cfg.yawSpeed*stickMult*dt)%360
     -- Aiming allows a steeper look up; leaving it eases back to the exploration limit.
+    -- Looking down is limited while aiming so the crosshair never sits on her own feet.
     local maxPitch=aiming and 55 or 45
-    pitch=math.max(-55,pitch+y*cfg.pitchSpeed*stickMult*dt*(cfg.invertY and -1 or 1))
+    local minPitch=aiming and (cfg.aimMinPitch or -35) or -55
+    local wanted=pitch+y*cfg.pitchSpeed*stickMult*dt*(cfg.invertY and -1 or 1)
+    if wanted<minPitch then wanted=pitch<minPitch and math.max(wanted,ease(pitch,minPitch,8,dt)) or minPitch end
+    pitch=wanted
     if pitch>maxPitch then pitch=aiming and maxPitch or ease(pitch,maxPitch,8,dt) end
     if aiming then
         -- In RE4 style: character smoothly aligns body rotation with camera yaw
@@ -470,6 +474,6 @@ function M.update(pc,dt)
     camera:SetFieldOfView(currentFov)
     if not camera.bIsActive then camera:Activate(false) end
     if not warming and pc:GetViewTarget():GetAddress()~=p:GetAddress() then pc:SetViewTargetWithBlend(p,0.0,0,0.0,false) end
-    if aiming and (cfg.freeAim or cfg.crosshair) then aim.update(pc,p) else aim.clear() end
+    if aiming and (cfg.freeAim or cfg.crosshair) then aim.update(pc,p,dt) else aim.clear() end
 end
 return M

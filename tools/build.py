@@ -7,7 +7,7 @@ import shutil
 import urllib.request
 import zipfile
 
-VERSION='0.3.1'
+VERSION='0.4.0'
 RUNTIME='UE4SS_v3.0.1-1176-g1ba38db4.zip'
 RUNTIME_SHA256='e615ee7a2c24344ea5aeef85183d6cfd550f4f6352225976679f9fefffd0b9a5'
 URL='https://github.com/UE4SS-RE/RE-UE4SS/releases/download/experimental-latest/'+RUNTIME
@@ -54,7 +54,7 @@ def build(runtime_zip=None):
         for file in sorted(out.rglob('*')):
             if file.is_file(): z.write(file,name+'/'+file.relative_to(out).as_posix())
     checksum=hashlib.sha256(result.read_bytes()).hexdigest()
-    result.with_suffix('.zip.sha256').write_text(checksum+'  '+result.name+'\n',encoding='ascii')
+    result.with_suffix('.zip.sha256').write_text(checksum+'  '+result.name+'\n',encoding='ascii',newline='\n')
     print(result)
     return out
 

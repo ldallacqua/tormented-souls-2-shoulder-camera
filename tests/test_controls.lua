@@ -149,4 +149,21 @@ frames(1)
 assert(montage==nil,'Leaving aim stops the montage')
 assert(movement.GroundFriction==8 and movement.Velocity.X==0,'Leaving aim restores the movement component')
 assert(feed(0.8)==0.8,'Movement input is untouched when not aiming')
-print('PASS: L3 shoulder swap, aim blend, stick curve, quick turn and aim stick hold')
+axes.Gamepad_LeftY=0
+
+-- Looking down: -55 in exploration, aimMinPitch (-35) while aiming, eased on entry.
+local function lookDown(n)
+    axes.Gamepad_RightY=1;frames(n)
+    if control.pitch>-1 then axes.Gamepad_RightY=-1;frames(n) end
+end
+lookDown(120)
+assert(close(control.pitch,-55,0.01),'Exploration looks down to -55')
+pawn.isAiming=true
+frames(1)
+assert(control.pitch<-40,'Entering aim does not snap the camera up')
+frames(60)
+assert(close(control.pitch,-35,0.05),'Aiming eases to aimMinPitch and holds it against the stick')
+axes.Gamepad_RightY=0
+pawn.isAiming=false
+frames(30)
+print('PASS: L3 shoulder swap, aim blend, stick curve, quick turn, aim stick hold and aim pitch floor')

@@ -182,3 +182,113 @@ ammo.GetActorForwardVector=function() error('boom') end
 shoot(ammo,{X=1,Y=0,Z=0})
 assert(cfg.freeAim==false and messages[#messages]:find('freeAim disabled'),'A failing hook must disable free aim')
 print('PASS: free aim retarget, spread, filtering, wall fallback and error isolation')
+
+-- Torso pitch follows the crosshair within the anim blueprint's -30..+40 range.
+ammo.GetActorForwardVector=function() return {X=1,Y=0,Z=0} end
+cfg.freeAim=true
+assert(close(aim.torsoPitch({X=0,Y=0,Z=0},{X=100,Y=0,Z=100}),40),'Up is clamped to +40')
+assert(close(aim.torsoPitch({X=0,Y=0,Z=0},{X=100,Y=0,Z=-20}),math.deg(math.atan(-20,100))),'Small angles bend 1:1')
+assert(close(aim.torsoPitch({X=0,Y=0,Z=0},{X=10,Y=0,Z=-500}),-30),'Down is clamped to -30')
+assert(aim.torsoPitch({X=0,Y=0,Z=0},{X=0,Y=0,Z=-500})==0,'A point straight below gives no bend')
+-- Shots steeper than -50 degrees are raised (never into her feet); others are untouched.
+local limited=aim.limitShot(unit({X=1,Y=0,Z=-3}))
+assert(close(math.deg(math.asin(limited.Z)),-50,1e-6) and limited.X>0 and close(limited.Y,0),'Steep shots are raised')
+local level=unit({X=1,Y=1,Z=-0.2})
+assert(aim.limitShot(level)==level,'Shallow shots are untouched')
+
+pawn.RotationToAim={pitch=0,Yaw=7,Roll=1}
+aim.update(pc,pawn,0.016)
+assert(pawn.RotationToAim.pitch>0 and pawn.RotationToAim.Yaw==7 and pawn.RotationToAim.Roll==1,'The torso eases towards the crosshair, keeping yaw/roll')
+for _=1,120 do aim.update(pc,pawn,0.016) end
+local want=math.deg(math.atan(160-140,wall))
+assert(close(pawn.RotationToAim.pitch,want,0.05),'The torso settles on the crosshair elevation')
+aim.clear()
+assert(pawn.RotationToAim.pitch==0 and pawn.RotationToAim.Yaw==7,'Ending the aim straightens the torso')
+cfg.torsoAim=false
+aim.update(pc,pawn,0.016)
+assert(pawn.RotationToAim.pitch==0,'torsoAim=false leaves the torso to the game')
+aim.clear()
+cfg.torsoAim=nil
+
+-- Impact marks: queued by the shot hooks, traced next frame, enemies skipped, one per shot.
+local decals={}
+local midOk=true
+local statics={SpawnDecalAtLocation=function(_,_,material,size,location,rotation,life)
+    local d={material=material,size=size,location=location,rotation=rotation,life=life,textures={}}
+    d.IsValid=function() return true end
+    d.SetHiddenInGame=function(self,h) self.hidden=h end
+    d.CreateDynamicMaterialInstance=function(self)
+        if not midOk then return nil end
+        return {IsValid=function() return true end,SetTextureParameterValue=function(_,name,t) self.textures[name:ToString()]=t end}
+    end
+    decals[#decals+1]=d
+    return d
+end}
+package.loaded.UEHelpers.GetGameplayStatics=function() return statics end
+realTrace=traceLibrary.LineTraceSingle
+traceLibrary.LineTraceSingle=function(...)
+    local args={...}
+    local blocked=realTrace(...)
+    if blocked then args[9].ImpactNormal={X=-1,Y=0,Z=0} end
+    return blocked
+end
+cfg.impactMarks=true
+aim.update(pc,pawn,0.016)
+shoot(ammo,{X=1,Y=0,Z=0})
+rotation(param(ammo),param({pitch=0,Yaw=0,Roll=0}))
+assert(#decals==0,'Marks are never placed inside the native hook')
+aim.update(pc,pawn,0.016)
+assert(#decals==1,'One mark per shot even when trace and rotation hooks both report it')
+local mark=decals[1]
+assert(close(mark.location.X,wall) and close(mark.location.Z,140+(160-140)*(wall-muzzle.X)/wall,1e-3),'The mark sits where the shot hits')
+assert(close(mark.rotation.Yaw,0) and close(mark.rotation.pitch,0),'The decal projects into the surface')
+assert(mark.life==30 and mark.size.Y==5 and mark.material,'Default life and size')
+assert(mark.material:GetFName():ToString():find('Blood_Stain') and mark.textures.DRO and mark.textures.Albedo and mark.textures.Normal,
+    'The Megascans decal gets the black albedo, flat normal and impact opacity textures')
+assert(messages[#messages]:find('Impact marks use'),'The material choice is logged once')
+-- A shot on an enemy leaves no mark.
+traceLibrary.LineTraceSingle=function(...)
+    local args={...}
+    local blocked=realTrace(...)
+    if blocked then
+        args[9].ImpactNormal={X=-1,Y=0,Z=0}
+        args[9].Component={Get=function() return {IsValid=function() return true end,GetOwner=function() return enemy end} end}
+    end
+    return blocked
+end
+shoot(ammo,{X=1,Y=0,Z=0})
+aim.update(pc,pawn,0.016)
+assert(#decals==1,'Enemies get no mark')
+traceLibrary.LineTraceSingle=realTrace
+-- Off: nothing is queued or placed.
+cfg.impactMarks=false
+shoot(ammo,{X=1,Y=0,Z=0})
+aim.update(pc,pawn,0.016)
+assert(#decals==1,'impactMarks=false places nothing')
+-- Without a dynamic material the base blood stain is hidden, not left behind.
+cfg.impactMarks=true;midOk=false
+traceLibrary.LineTraceSingle=function(...)
+    local args={...}
+    local blocked=realTrace(...)
+    if blocked then args[9].ImpactNormal={X=-1,Y=0,Z=0} end
+    return blocked
+end
+shoot(ammo,{X=1,Y=0,Z=0})
+aim.update(pc,pawn,0.016)
+assert(#decals==2 and decals[2].hidden==true,'A decal without its impact material is hidden')
+midOk=true
+-- A failing spawn switches marks off once.
+cfg.impactMarks=true
+statics.SpawnDecalAtLocation=function() error('decal boom') end
+traceLibrary.LineTraceSingle=function(...)
+    local args={...}
+    local blocked=realTrace(...)
+    if blocked then args[9].ImpactNormal={X=-1,Y=0,Z=0} end
+    return blocked
+end
+shoot(ammo,{X=1,Y=0,Z=0})
+aim.update(pc,pawn,0.016)
+assert(cfg.impactMarks==false and messages[#messages]:find('Impact marks disabled'),'A failing mark disables the feature')
+traceLibrary.LineTraceSingle=realTrace
+aim.clear()
+print('PASS: torso pitch, shot floor limit and impact marks')

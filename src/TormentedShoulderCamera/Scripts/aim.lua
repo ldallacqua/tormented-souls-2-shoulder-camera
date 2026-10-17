@@ -3,9 +3,11 @@
 -- K2_SetActorRotation and fires LineTraceMulti from the muzzle. Both native calls are
 -- adjusted so the shot goes to the point under the crosshair. Spread relative to the
 -- game's own direction is kept. Nothing changes unless camera.lua arms it each frame.
+-- It also bends Caroline's torso towards the crosshair and marks where shots land.
 local UEHelpers=require('UEHelpers')
 local directory=debug.getinfo(1,'S').source:sub(2):match('^(.*[/\\])')
 local crosshair=dofile(directory..'crosshair.lua')
+local impact=dofile(directory..'impact.lua')
 local M={}
 local cfg,log
 local armed=false
@@ -26,6 +28,15 @@ local ammoClass='/Game/GameplaySystems/WeaponSystem/Ammo/BP_BaseAmmo.BP_BaseAmmo
 local noColor={R=0,G=0,B=0,A=0}
 local SPREAD=math.cos(math.rad(20)) -- Wider deviations are not spread: the shot ignored the base direction.
 local RANGE=6000
+-- Torso pitch (probed): the character's RotationToAim.pitch drives four ModifyBone nodes on
+-- spine_02 in her anim blueprint, 1:1, clamped there to -30..+40 degrees. It is how the game
+-- bends her towards a target on the floor; free aim writes it from the crosshair point.
+M.TORSO_MIN,M.TORSO_MAX=-30,40
+local TORSO_PIVOT=40 -- Height of her hands above the actor origin when aiming level.
+-- Steeper shots are raised to this pitch so they cannot land at her feet.
+M.SHOT_MIN_PITCH=-50
+local torso=nil -- Current eased torso pitch while free aim owns RotationToAim.
+local torsoPawn=nil
 local function valid(o) return o and o:IsValid() end
 local function vec(v) return {X=v.X,Y=v.Y,Z=v.Z} end
 local function add(a,b) return {X=a.X+b.X,Y=a.Y+b.Y,Z=a.Z+b.Z} end
@@ -51,6 +62,23 @@ local function toRotator(d,roll)
     return {pitch=math.deg(math.asin(math.max(-1,math.min(1,d.Z)))),Yaw=math.deg(math.atan(d.Y,d.X)),Roll=roll or 0}
 end
 M._math={rotateOnto=rotateOnto,fromRotator=fromRotator,toRotator=toRotator}
+
+-- Torso pitch from her hands (origin) to the aim point, within the anim blueprint's range.
+function M.torsoPitch(origin,target)
+    local d=sub(target,origin)
+    local h=math.sqrt(d.X*d.X+d.Y*d.Y)
+    if h<1 then return 0 end
+    return math.max(M.TORSO_MIN,math.min(M.TORSO_MAX,math.deg(math.atan(d.Z,h))))
+end
+-- Raises a unit direction that points down more steeply than SHOT_MIN_PITCH.
+function M.limitShot(a)
+    local minZ=math.sin(math.rad(M.SHOT_MIN_PITCH))
+    if a.Z>=minZ then return a end
+    local h=math.sqrt(a.X*a.X+a.Y*a.Y)
+    if h<1e-6 then return nil end
+    local c=math.cos(math.rad(M.SHOT_MIN_PITCH))
+    return {X=a.X/h*c,Y=a.Y/h*c,Z=minZ}
+end
 
 local function hitActor(hit)
     local ok,c=pcall(function() return hit.Component:Get() end)
@@ -88,7 +116,22 @@ local function probe(kind,object)
     probes[kind..class]=true;probeCount=probeCount+1
     log('Aim probe '..kind..': '..class)
 end
-function M.update(pc,p)
+local function bendTorso(p,dt)
+    local r=p.RotationToAim
+    if not r then return end -- Another playable character without the spine bend.
+    local want=M.torsoPitch(add(vec(p:K2_GetActorLocation()),{X=0,Y=0,Z=TORSO_PIVOT}),point)
+    torso=torso or r.pitch or 0
+    torso=torso+(want-torso)*math.min(1,12*dt)
+    p.RotationToAim={pitch=torso,Yaw=r.Yaw,Roll=r.Roll}
+    torsoPawn=p
+end
+local function straightenTorso()
+    local p=torsoPawn
+    torso=nil;torsoPawn=nil
+    if not valid(p) then return end
+    pcall(function() local r=p.RotationToAim;p.RotationToAim={pitch=0,Yaw=r.Yaw,Roll=r.Roll} end)
+end
+function M.update(pc,p,dt)
     pawn=p;armed=true
     if cfg.freeAim and #shotHooks==0 then
         for _,h in ipairs(shotHandlers) do register(shotHooks,h[1],h[2]) end
@@ -102,9 +145,19 @@ function M.update(pc,p)
     point,dir=pt,fwd
     onEnemy=valid(actor) and actor:GetAddress()~=p:GetAddress() and actor:IsA('/Script/Engine.Pawn') or false
     crosshair.update(pc,cfg.crosshair,onEnemy)
+    if cfg.freeAim and cfg.torsoAim~=false then
+        local okBend,err=pcall(bendTorso,p,math.min(dt or 0.016,0.05))
+        if not okBend then cfg.torsoAim=false;straightenTorso();log('Torso aim disabled after error: '..tostring(err)) end
+    end
+    if cfg.impactMarks then
+        local okMarks,err=pcall(impact.flush,cfg,p,channel,log)
+        if not okMarks then cfg.impactMarks=false;impact.clear();log('Impact marks disabled after error: '..tostring(err)) end
+    end
 end
 function M.clear()
     if armed then crosshair.update(nil,false) end
+    if torsoPawn then straightenTorso() end
+    impact.clear()
     armed=false;onEnemy=false;point=nil
 end
 
@@ -113,7 +166,7 @@ end
 local function aimFrom(origin)
     local a=norm(sub(point,origin))
     if not a or dot(a,dir)<0.5 then a=dir end
-    return a
+    return M.limitShot(a) or a
 end
 local function ammoOf(kind,object)
     if not armed or not cfg.freeAim or not point or not valid(pawn) then return nil end
@@ -155,6 +208,7 @@ function M.init(config,logger)
         local a=aimFrom(vec(ammo:K2_GetActorLocation()))
         local shot=rotateOnto(requested,base,a)
         newRotation:set(toRotator(shot,r.Roll))
+        if cfg.impactMarks then impact.queue(vec(ammo:K2_GetActorLocation()),shot,RANGE) end
         report('rotation',requested,shot)
     end)}
     -- Hitscan: the trace end decides what is hit.
@@ -171,6 +225,7 @@ function M.init(config,logger)
         local base=(forward and dot(d,forward)>SPREAD) and forward or d
         local shot=rotateOnto(d,base,aimFrom(s))
         finish:set(add(s,scale(shot,length)))
+        if cfg.impactMarks then impact.queue(s,shot,length) end
         report('trace',d,shot)
     end)}
     crosshair.init(logger)

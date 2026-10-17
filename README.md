@@ -32,7 +32,7 @@ O D-pad deixa de movimentar a personagem durante a exploração com o mod ativo.
 
 ## Configuração e remoção
 
-Com o jogo fechado, edite `ue4ss/Mods/TormentedShoulderCamera/Scripts/config.lua`: distância, altura, ombro, FOV, sensibilidade, curva do analógico, zona morta, eixo vertical, raio de colisão, mira livre, retículo, botão de troca de ombro e quick turn.
+Com o jogo fechado, edite `ue4ss/Mods/TormentedShoulderCamera/Scripts/config.lua`: distância, altura, ombro, FOV, sensibilidade, curva do analógico, zona morta, eixo vertical, raio de colisão, mira livre, inclinação do tronco, marcas de tiro, retículo, botão de troca de ombro e quick turn. Quem atualiza mantém o `config.lua` antigo; sem a linha `impactMarks=true`, as marcas de tiro ficam desligadas.
 
 Use `Desativar.cmd`/`Ativar.cmd` para desativar ou ativar entre partidas. Para remover, exclua a pasta do mod e sua linha em `ue4ss/Mods/mods.txt`. Caso nenhum outro mod use UE4SS, também é possível remover o `dwmapi.dll` e a pasta `ue4ss` adicionados pelo pacote. O instalador não modifica executáveis, conteúdo `.pak/.ucas/.utoc` ou saves do jogo.
 
@@ -43,7 +43,7 @@ Use `Desativar.cmd`/`Ativar.cmd` para desativar ou ativar entre partidas. Para r
 - Usa o braço de câmera nativo e varreduras esféricas de visibilidade contra colisão simples e geometria detalhada. Recolhe imediatamente diante de obstáculos e retorna suavemente à distância normal.
 - Congela a visão no ombro na pausa, no inventário e em interações curtas com puzzles/itens. Close-ups do próprio jogo, cinemáticas, diálogos e outros estados detectados usam a câmera original.
 - Movimento de câmera sutil: respiração e inclinação leve nas curvas (`sway`/`swayAmount` no config). Sem balanço de passos.
-- Mira livre experimental: ao mirar, a personagem gira com a câmera e o tiro vai para o centro da tela. A animação não inclina a arma para cima/baixo, então tiros muito inclinados saem visualmente do cano reto. Desative com `freeAim=false` para voltar à mira assistida do jogo.
+- Mira livre experimental: ao mirar, a personagem gira com a câmera e o tiro vai para o centro da tela. O tronco inclina para o retículo dentro do limite da animação do jogo (30° para baixo, 40° para cima); além disso o tiro ainda vai ao retículo, mas a arma não acompanha. A câmera não desce além de -35° na mira e nenhum tiro sai mais inclinado que 50° para baixo, para não acertar os próprios pés. Marcas escuras mostram onde cada tiro bateu (`impactMarks=false` desliga). Desative tudo com `freeAim=false` para voltar à mira assistida do jogo.
 - Andar mirando: para frente usa a caminhada mirando do jogo; para trás, a mesma caminhada tocada ao contrário (arma erguida); para os lados, os passos laterais da Caroline. O recuo com a arma erguida depende de mapear a caminhada mirando de cada arma: a Nailgun foi medida no jogo; pregadora automática, Hand Cannon, martelo e pé de cabra estão mapeados pelo nome da animação, sem validação. Outras armas usam o recuo genérico, que abaixa a arma. Teclado não move a personagem enquanto mira.
 
 É um protótipo: os testes não cobrem a campanha inteira, todos os puzzles, chefes ou cinematics. Espaços muito apertados podem aproximar a câmera da personagem. Objetos sem geometria de colisão consultável podem continuar apresentando problemas. Cenários feitos para ângulos fixos podem revelar superfícies sem acabamento. F6 permite voltar à câmera original.

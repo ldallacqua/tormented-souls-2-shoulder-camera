@@ -22,6 +22,10 @@ files must not be edited or committed. Regenerate them with `python tools/build.
   once on the first aim, return early unless armed, filter on BP_BaseAmmo, self-disable on error.
   Do not unregister per aim: UE4SS defers native removal and still runs the pending callback.
 - The crosshair is a UMG viewport widget; HUD:ReceiveDrawHUD does not fire in this game.
+- Torso aim writes `RotationToAim.pitch` every aiming frame and must reset it to 0 when aiming ends
+  (`aim.clear`). The ABP clamps it to -30..+40; do not bend the spine through other bones.
+- Impact marks are traced outside native hooks. The game's particle decal materials do not work as
+  plain decals; keep the Megascans decal + dynamic textures, and hide a decal whose instance failed.
 - Pause, inventory and short puzzle/item interactions freeze the shoulder view. Close-up cameras
   the game requests during interactions, cinematics and dialogue must keep their native framing.
 - F6 and error recovery must restore changes. Keep mod state independent of saves.

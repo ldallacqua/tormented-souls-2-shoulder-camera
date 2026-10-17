@@ -1,5 +1,5 @@
 SOURCE='src/TormentedShoulderCamera/Scripts'
-for _,name in ipairs({'main','camera','config','input','collision','aim','crosshair','motion','aimwalk'}) do
+for _,name in ipairs({'main','camera','config','input','collision','aim','crosshair','motion','aimwalk','impact'}) do
     assert(loadfile(SOURCE..'/'..name..'.lua'))
 end
 print('PASS: syntax')

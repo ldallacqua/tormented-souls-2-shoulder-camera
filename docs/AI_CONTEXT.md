@@ -7,7 +7,8 @@ identified in README). It replaces fixed exploration cameras with an orbiting sh
 view for a controller. Native target selection, damage, animations and puzzle logic remain;
 aiming is reworked (free aim to the crosshair, RE4-style walking while aiming).
 
-Version 0.3.1 rebuilds the aim walk (reversed weapon aim-walk montage for the backpedal,
+Version 0.4.0 bends the torso to the crosshair (`RotationToAim`), limits steep shots and adds
+impact marks (impact.lua). Version 0.3.1 rebuilds the aim walk (reversed weapon aim-walk montage for the backpedal,
 side-step montages, CharacterMovement velocity instead of per-frame teleports). Version 0.3.0 adds: hold/freeze of the shoulder view for inventory and short interactions
 (no fixed-camera flash), free aim + UMG crosshair, RE4-style aim walk (aimwalk.lua), L3
 shoulder swap, quick turn, breathing sway/turn lean (no footstep bob: it caused motion
@@ -97,6 +98,11 @@ channel of the last shot is reused for the crosshair trace (aim capsules). Unkno
 weapons trace vs. fly, whether shotgun pellets are separate actors, and how the game's
 target lock (`RotateToTarget`) interacts with the body alignment. Read the `Free aim` logs.
 
+`aim.lua` also writes `RotationToAim.pitch` from the hands (actor + 40 cm) to the crosshair point,
+eased, and resets it to 0 when aiming ends; it limits shots to -50 deg pitch. Camera pitch while
+aiming stops at `aimMinPitch` (-35). `impact.lua` gets each adjusted shot from the hooks, traces it on
+the next frame (never inside the native hook) and places the decal; no marks on pawns.
+
 `HUD:ReceiveDrawHUD` never fires here (no Blueprint HUD draw event), so `crosshair.lua`
 creates a `WBP_FPSShow` instance as a host, replaces its `WidgetTree.RootWidget` with a
 CanvasPanel of five Images and adds it to the viewport (hit-test invisible). UE4SS removes
@@ -139,6 +145,14 @@ to facing, ABP variables), not by decompiling:
 - Teleporting with swept `K2_SetActorLocation` each frame made the actor height oscillate
   ~1 cm per frame (camera judder). Writing `CharacterMovement.Velocity` with `GroundFriction=0`
   and `BrakingDecelerationWalking=0` moves her while aiming with a stable height and smooth steps.
+- Torso pitch: `BP_TormentedSoulCharacter.RotationToAim` (rotator, lowercase `pitch`) feeds four
+  ModifyBone nodes on `spine_02_x` in `ABP_CarolineCharacter` (BreakRotator -> Multiply -> FClamp ->
+  MakeRotator roll). Measured 1:1 bend, clamped by the ABP to -30..+40 deg. The game does not write it
+  while aiming without a target. A LookAt node on `neck_x` (clamp 35) uses `TargetLocation`/`LookAtAlpha`.
+- Decals: the particle decal materials (`MI_BurnDecal` parent `M_Alpha_Sprite_Lit`, `MI_GroundCrackDecal`,
+  `MI_BloodStainDecal`) render as plain squares from `SpawnDecalAtLocation`. `M_MS_Decal_Material`
+  (Megascans, params Albedo/Normal/DRO) with a dynamic instance (Albedo `/Engine/EngineResources/Black`,
+  Normal `FlatNormal`, DRO `/Game/Particles/Textures/Impact23`) gives a dark impact star.
 `aimwalk.lua` builds the RE4 walk from these: pre-hooks zero the game's stick input,
 post-hooks rewrite `StickY` for the forward cycle, `plan` picks forward/back/left/right and the
 rate, the animator plays side steps or the reversed aim walk (`back_pedal` for unmapped weapons)
