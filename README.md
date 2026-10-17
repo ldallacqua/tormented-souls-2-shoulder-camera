@@ -21,6 +21,9 @@ O instalador verifica a versão do executável e a integridade do pacote. Ele re
 | Analógico direito | Girar câmera e olhar para cima/baixo |
 | D-pad ↑ ↓ ← → | Quatro atalhos direcionais originais |
 | Clique do analógico direito | Atalho central original |
+| Clique do analógico esquerdo (L3) | Trocar o ombro |
+| Analógico esquerdo para trás + correr/esquivar | Quick turn de 180° |
+| Mirar + analógico esquerdo | Anda mirando em qualquer direção (estilo RE4), voltada para o retículo; o tiro segue o retículo |
 | F6 | Alternar câmera do mod/original; restaurar os atalhos originais |
 | F7 | Trocar o ombro |
 | Home | Centralizar atrás da personagem |
@@ -29,7 +32,7 @@ O D-pad deixa de movimentar a personagem durante a exploração com o mod ativo.
 
 ## Configuração e remoção
 
-Com o jogo fechado, edite `ue4ss/Mods/TormentedShoulderCamera/Scripts/config.lua`: distância, altura, ombro, FOV, sensibilidade, zona morta, eixo vertical e raio de colisão.
+Com o jogo fechado, edite `ue4ss/Mods/TormentedShoulderCamera/Scripts/config.lua`: distância, altura, ombro, FOV, sensibilidade, curva do analógico, zona morta, eixo vertical, raio de colisão, mira livre, retículo, botão de troca de ombro e quick turn.
 
 Use `Desativar.cmd`/`Ativar.cmd` para desativar ou ativar entre partidas. Para remover, exclua a pasta do mod e sua linha em `ue4ss/Mods/mods.txt`. Caso nenhum outro mod use UE4SS, também é possível remover o `dwmapi.dll` e a pasta `ue4ss` adicionados pelo pacote. O instalador não modifica executáveis, conteúdo `.pak/.ucas/.utoc` ou saves do jogo.
 
@@ -38,8 +41,10 @@ Use `Desativar.cmd`/`Ativar.cmd` para desativar ou ativar entre partidas. Para r
 - Mantém a câmera da personagem como alvo ao atravessar gatilhos das câmeras fixas, evitando flashes dessas câmeras.
 - Atualiza as referências de direção que o jogo usa para o movimento, incluindo as referências das transições de câmera.
 - Usa o braço de câmera nativo e varreduras esféricas de visibilidade contra colisão simples e geometria detalhada. Recolhe imediatamente diante de obstáculos e retorna suavemente à distância normal.
-- Devolve o controle ao jogo em inventário, puzzles, interações e outros estados detectados.
-- Preserva o combate e a mira assistida do jogo. Não adiciona mira livre por retículo nem converte todo o combate para o de RE4.
+- Congela a visão no ombro na pausa, no inventário e em interações curtas com puzzles/itens. Close-ups do próprio jogo, cinemáticas, diálogos e outros estados detectados usam a câmera original.
+- Movimento de câmera sutil: respiração e inclinação leve nas curvas (`sway`/`swayAmount` no config). Sem balanço de passos.
+- Mira livre experimental: ao mirar, a personagem gira com a câmera e o tiro vai para o centro da tela. A animação não inclina a arma para cima/baixo, então tiros muito inclinados saem visualmente do cano reto. Desative com `freeAim=false` para voltar à mira assistida do jogo.
+- Andar mirando: o jogo só possui a caminhada para frente com arma. O mod a reutiliza (ao contrário para recuar, passos curtos de lado). Passos laterais não têm animação própria. Teclado não move a personagem enquanto mira.
 
 É um protótipo: os testes não cobrem a campanha inteira, todos os puzzles, chefes ou cinematics. Espaços muito apertados podem aproximar a câmera da personagem. Objetos sem geometria de colisão consultável podem continuar apresentando problemas. Cenários feitos para ângulos fixos podem revelar superfícies sem acabamento. F6 permite voltar à câmera original.
 

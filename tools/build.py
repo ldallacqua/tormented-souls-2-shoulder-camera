@@ -7,7 +7,7 @@ import shutil
 import urllib.request
 import zipfile
 
-VERSION='0.2.1'
+VERSION='0.3.0'
 RUNTIME='UE4SS_v3.0.1-1176-g1ba38db4.zip'
 RUNTIME_SHA256='e615ee7a2c24344ea5aeef85183d6cfd550f4f6352225976679f9fefffd0b9a5'
 URL='https://github.com/UE4SS-RE/RE-UE4SS/releases/download/experimental-latest/'+RUNTIME

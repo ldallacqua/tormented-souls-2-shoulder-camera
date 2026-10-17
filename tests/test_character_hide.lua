@@ -44,6 +44,7 @@ pawn.K2_GetActorRotation=function() return rotator(0) end
 pawn.K2_GetComponentsByClass=function() local list={} for i,c in ipairs(parts) do list[i]={get=function() return c end} end return list end
 local pc=object('Controller',{Pawn=pawn})
 pc.GetInputAnalogKeyState=function() return 0 end
+pc.IsInputKeyDown=function() return false end
 pc.SetControlRotation=function() end
 pc.GetViewTarget=function() return pawn end
 pc.SetViewTargetWithBlend=function() end

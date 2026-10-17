@@ -4,13 +4,14 @@
 
 An unofficial UE4SS Lua mod for Tormented Souls 2 (Windows, tested UE 5.5.4 executable
 identified in README). It replaces fixed exploration cameras with an orbiting shoulder
-view for a controller. Native combat, target selection, animation and puzzle logic remain.
+view for a controller. Native target selection, damage, animations and puzzle logic remain;
+aiming is reworked (free aim to the crosshair, RE4-style walking while aiming).
 
-Version 0.2.1 incorporates two-stage camera collision (head-to-shoulder, shoulder-back),
-safe character hiding when close to head (<30 cm), and elimination of the ~180° snap
-when entering zone cameras by disabling AutoNorthLocal on BP_RailCamera and synchronizing
-movement references. A small flash remains when returning from inventory/item interaction
-to the shoulder view. This is the next investigation target; do not describe it as already fixed.
+Version 0.3.0 adds: hold/freeze of the shoulder view for inventory and short interactions
+(no fixed-camera flash), free aim + UMG crosshair, RE4-style aim walk (aimwalk.lua), L3
+shoulder swap, quick turn, breathing sway/turn lean (no footstep bob: it caused motion
+sickness). 0.2.1 brought two-stage collision, character hiding near the head and the zone
+camera snap fix. See CHANGELOG for what is validated in game and what is not.
 
 ## Runtime flow
 
@@ -22,8 +23,15 @@ and input state and disables further updates for the current session.
 their properties, and uses them for shoulder framing. A native pre-hook on
 `/Script/Engine.PlayerController:SetViewTargetWithBlend` redirects fixed CameraActor or
 RailCamera targets to the character only when the mod owns the view. CineCameraActor
-targets and blocked gameplay modes are excluded. Pause keeps the last shoulder view
-frozen. Inventory, puzzle and interaction modes restore native view/component settings.
+targets and blocked gameplay modes are excluded. `holdReasons` (pause, inventory, puzzle,
+preview, POI, text and the puzzle/POI flags) keep the last shoulder view frozen. During a
+hold, pause/inventory redirect any fixed camera; other holds redirect only the room camera
+that was replaced (`originalView`). Any other requested camera is the game's close-up: it is
+shown (`handedOff`) and the rig stays configured for the return. A close-up redirected less
+than 0.5 s before the hold, or a `GameInstance.CurrentCamera` that is not the room camera,
+is restored the same way. Other blocked states (cinematic, dialogue, menus, death, climbing,
+`isInputDisabled`, `bIsCharacterInteracting`) still restore native view/component settings;
+the return configures the rig one frame before switching the view target.
 
 `input.lua` modifies existing mapping entries in `/Game/NewInputSystem/IMC_InGame`,
 `IMC_InGame2` and `IMC_InGame3` in memory. It replaces the action of the four gamepad
@@ -65,19 +73,67 @@ it from collapsing the camera back to the head when against a back wall.
 - `LoopInGameThreadAfterFrames(1, ...)` runs every game frame; no dt parameter is supplied.
   `GetWorldDeltaSeconds` is used and rotation dt is clamped to 0.05 seconds.
 
-## Next investigation: inventory/item return flicker
+## Inventory/item return flicker (inventory and puzzle close-up validated)
 
-Working hypothesis, not yet proved: the mode callback restores the native camera, then
-resume leaves a frame before the next `camera.update` reclaims the pawn. The native
-spring arm may also still have the old transform when SetViewTarget switches back.
+Logs showed the game never changes view target when the inventory opens, and short item/
+puzzle interactions run `puzzle -> inventory -> puzzle -> gameplay`, followed by about 0.5 s
+of `isInteractingWithPuzzleComp`. The old full restore exposed the room camera for that
+whole span. The hold model above replaces it. Still unverified in game: puzzles with real
+close-ups, item inspection and document reading. Use the `State`, `Native camera during`
+and `Close-up camera restored` log lines when testing. If a puzzle shows the frozen shoulder
+view instead of its close-up, log which camera the game used before widening the redirect rule.
 
-Inspect the order of mode hooks, interaction flags, SetViewTargetWithBlend and camera
-component updates. Consider synchronizing the return transition before rendering or
-preparing the shoulder components while the native inventory view remains active.
-Do not force the shoulder camera during inventory, puzzle close-ups or cutscenes.
-Avoid delaying all transitions or overriding every CameraActor without mode checks.
-Validate repeated inventory open/close, item inspect/close, pause, fixed-camera triggers,
-and F6 restoration. Preserve the validated movement and collision algorithms.
+## Free aim (experimental, in validation)
+
+`aim.lua` arms itself only while `isAiming` in the shoulder view. Each frame it traces from
+the screen centre (starting level with Caroline) and caches the point under the crosshair.
+Player ammo (`/Game/GameplaySystems/WeaponSystem/Ammo/BP_BaseAmmo`) gets its muzzle socket,
+turns with `FindLookAtRotation` + `K2_SetActorRotation`, then fires `LineTraceMulti` and
+applies damage (dump of the ubergraph locals; not decompiled). Native pre-hooks rotate both
+towards the crosshair point with a Rodrigues rotation, so deviations from the base direction
+(pellet spread) survive. Deviations above 20 deg are treated as an unrelated base. The trace
+channel of the last shot is reused for the crosshair trace (aim capsules). Unknowns: which
+weapons trace vs. fly, whether shotgun pellets are separate actors, and how the game's
+target lock (`RotateToTarget`) interacts with the body alignment. Read the `Free aim` logs.
+
+`HUD:ReceiveDrawHUD` never fires here (no Blueprint HUD draw event), so `crosshair.lua`
+creates a `WBP_FPSShow` instance as a host, replaces its `WidgetTree.RootWidget` with a
+CanvasPanel of five Images and adds it to the viewport (hit-test invisible). UE4SS removes
+native hooks only after their next call and still runs the pending pre-callback, so shot
+hooks are registered once on the first aim and gated by `armed`; never unregister them per
+aim. `Aim probe` logs list up to 12 classes calling the hooked functions while aiming.
+
+## Procedural motion
+
+`motion.lua` is pure: yaw rate and aim state in; FollowCamera relative rotation out
+(breathing sway < 0.3 deg, turn lean <= 1.6 deg). A footstep bob was tried and removed: it
+caused motion sickness. Do not reintroduce walking oscillation without an explicit request.
+The spring-arm positional lag (`followLag`, max 6 cm) is off by default for the same reason.
+
+## Aiming and movement (probed in game, 2026-10-17)
+
+Measured with a dev probe (planted-foot slide in Caroline's local frame, velocity relative
+to facing, ABP variables), not by decompiling:
+- Native aim movement: the C++ character turns towards the camera-relative stick and walks
+  along its facing at ~96 cm/s. `Moving F` is set for every direction; `Moving B/L/R`,
+  `Direction` and tank mode never produce a backpedal or strafe while aiming.
+- Writing `StickX/StickY` properties plays the aim-walk cycle (feet ~77 cm/s) without moving
+  her; movement only happens through `SetStick*Value`.
+- While aiming, `AddMovementInput` (from Lua or from a ReceiveTick hook) is ignored; a swept
+  `K2_SetActorLocation` moves her. `GlobalAnimRateScale=-1` turns the cycle into a correct
+  backpedal (feet slide forward).
+- A hidden mesh (`OwnerNoSee`, tick option 4) stops refreshing bones; probes force option 0.
+`aimwalk.lua` builds the RE4 walk from these: pre-hooks zero the game's stick input,
+post-hooks rewrite `StickY` for the cycle, `plan` picks direction/speed/rate (reversed for
+backpedal unless a shot/reload is playing), `move` sweeps with wall slide, 30 cm step-up,
+floor follow and no ledge drops. Side steps have no animation of their own (short shuffle).
+
+## Exploration input mappings (probed in game)
+
+Preset 1/3: A interact, X run/dodge, Y inventory, B reload, LB aim (+change target in
+preset 1; RB in preset 3), RT shoot, R3 centre shortcut, L3 `IA_InGame_OpenDebugMenu`, View
+map, Menu pause. Preset 2 differs: B inventory, Y reload, RT aim+shoot, LT change target.
+L3 is reused for the shoulder swap; quick turn polls X (`Gamepad_FaceButton_Left`).
 
 ## Local debugging without leaking user data
 

@@ -9,9 +9,16 @@ files must not be edited or committed. Regenerate them with `python tools/build.
 - Movement must remain relative to the visible camera through fixed-camera triggers.
 - Keep all four direction-reference rotators synchronized. Do not reintroduce tank movement.
 - Keep right-stick shortcuts disabled only in exploration presets; preserve inventory/puzzle controls.
+- While aiming the game's stick input is held at zero and aimwalk.lua moves Caroline. Restore
+  `GlobalAnimRateScale` to 1 whenever aiming ends or the camera is restored.
 - Up/down shortcut axes differ from movement axes. Preserve the tested inversion.
 - Camera sweeps must use hit fraction/distance, not the unreliable packed penetration boolean.
-- Pause freezes the shoulder view. Inventory and interaction cameras must keep their native framing.
+- Free-aim native hooks (K2_SetActorRotation, LineTraceMulti) fire for every actor: register them
+  once on the first aim, return early unless armed, filter on BP_BaseAmmo, self-disable on error.
+  Do not unregister per aim: UE4SS defers native removal and still runs the pending callback.
+- The crosshair is a UMG viewport widget; HUD:ReceiveDrawHUD does not fire in this game.
+- Pause, inventory and short puzzle/item interactions freeze the shoulder view. Close-up cameras
+  the game requests during interactions, cinematics and dialogue must keep their native framing.
 - F6 and error recovery must restore changes. Keep mod state independent of saves.
 
 ## Verification and release

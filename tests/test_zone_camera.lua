@@ -41,6 +41,7 @@ pawn.IsA=function() return true end
 pawn.K2_GetActorRotation=function() return rotator(30) end
 local pc=object('Controller',{Pawn=pawn})
 pc.GetInputAnalogKeyState=function() return 0 end
+pc.IsInputKeyDown=function() return false end
 pc.SetControlRotation=function() end
 pc.GetViewTarget=function() return pawn end
 pc.SetViewTargetWithBlend=function() end
